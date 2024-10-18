@@ -42,44 +42,8 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// Handle the /start command
-// bot.onText(/\/start/, async (msg) => {
-//   const chatId = msg.chat.id;
-//   const { id, first_name: firstName, last_name: lastName = "" } = msg.from;
-
-//   // Check if the user already exists in the database
-//   let user = await User.findOne({ telegramId: id });
-
-//   if (!user) {
-//     // If the user doesn't exist, create a new user in the database
-//     user = new User({ telegramId: id, firstName, lastName });
-//     await user.save();
-//   }
-
-//   // Modify the URL to include the user ID as a query parameter
-//   const inlineKeyboard = {
-//     reply_markup: {
-//       inline_keyboard: [
-//         [
-//           {
-//             text: "Launch",
-//             web_app: {
-//               url: `https://aelonnextfront.vercel.app/?userId=${user.telegramId}`,
-//             },
-//           },
-//         ],
-//       ],
-//     },
-//   };
-
-//   bot.sendMessage(
-//     chatId,
-//     `Welcome, ${user.firstName}! Click the button below to check your stats.`,
-//     inlineKeyboard
-//   );
-// });
-bot.onText(/\/start (.+)?/, async (msg, match) => {
+// Handle the /start command with or without a referral ID
+bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const referrerId = match[1]; // Extract the referrer ID from the referral link (if exists)
   const { id, first_name: firstName, last_name: lastName = "" } = msg.from;
@@ -115,11 +79,9 @@ bot.onText(/\/start (.+)?/, async (msg, match) => {
     },
   };
 
-  bot.sendMessage(
-    chatId,
-    `Welcome, ${user.firstName}! Click the button below to check your stats.`,
-    inlineKeyboard
-  );
+  // Send welcome message
+  const welcomeMessage = `Welcome, ${user.firstName}! Click the button below to check your stats.`;
+  bot.sendMessage(chatId, welcomeMessage, inlineKeyboard);
 
   // If the user was referred by someone, notify the referrer (optional)
   if (referrerId) {
@@ -132,6 +94,7 @@ bot.onText(/\/start (.+)?/, async (msg, match) => {
     }
   }
 });
+
 // Generate JWT token for authentication
 const generateToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "1h" });
