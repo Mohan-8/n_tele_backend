@@ -44,41 +44,41 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Handle the /start command
-bot.onText(/\/start/, async (msg) => {
-  const chatId = msg.chat.id;
-  const { id, first_name: firstName, last_name: lastName = "" } = msg.from;
+// bot.onText(/\/start/, async (msg) => {
+//   const chatId = msg.chat.id;
+//   const { id, first_name: firstName, last_name: lastName = "" } = msg.from;
 
-  // Check if the user already exists in the database
-  let user = await User.findOne({ telegramId: id });
+//   // Check if the user already exists in the database
+//   let user = await User.findOne({ telegramId: id });
 
-  if (!user) {
-    // If the user doesn't exist, create a new user in the database
-    user = new User({ telegramId: id, firstName, lastName });
-    await user.save();
-  }
+//   if (!user) {
+//     // If the user doesn't exist, create a new user in the database
+//     user = new User({ telegramId: id, firstName, lastName });
+//     await user.save();
+//   }
 
-  // Modify the URL to include the user ID as a query parameter
-  const inlineKeyboard = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: "Launch",
-            web_app: {
-              url: `https://full-walls-suffer.loca.lt/?userId=${user.telegramId}`,
-            },
-          },
-        ],
-      ],
-    },
-  };
+//   // Modify the URL to include the user ID as a query parameter
+//   const inlineKeyboard = {
+//     reply_markup: {
+//       inline_keyboard: [
+//         [
+//           {
+//             text: "Launch",
+//             web_app: {
+//               url: `https://aelonnextfront.vercel.app/?userId=${user.telegramId}`,
+//             },
+//           },
+//         ],
+//       ],
+//     },
+//   };
 
-  bot.sendMessage(
-    chatId,
-    `Welcome, ${user.firstName}! Click the button below to check your stats.`,
-    inlineKeyboard
-  );
-});
+//   bot.sendMessage(
+//     chatId,
+//     `Welcome, ${user.firstName}! Click the button below to check your stats.`,
+//     inlineKeyboard
+//   );
+// });
 bot.onText(/\/start (.+)?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const referrerId = match[1]; // Extract the referrer ID from the referral link (if exists)
@@ -107,7 +107,7 @@ bot.onText(/\/start (.+)?/, async (msg, match) => {
           {
             text: "Launch",
             web_app: {
-              url: `https://full-walls-suffer.loca.lt/?userId=${user.telegramId}`,
+              url: `https://aelonnextfront.vercel.app/?userId=${user.telegramId}`,
             },
           },
         ],
