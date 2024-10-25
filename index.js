@@ -235,10 +235,9 @@ const handleLogin = async (userId) => {
     } else {
       user.streakCount += 1;
     }
+  } else {
+    user.streakCount = 1;
   }
-  // else {
-  //   user.streakCount = 1;
-  // }
   const pointsEarned = user.streakCount <= 7 ? user.streakCount * 6 : 0;
   user.rewards += pointsEarned;
   if (user.streakCount > 7) {
