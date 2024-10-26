@@ -28,7 +28,10 @@ const UserSchema = new mongoose.Schema({
   lastLoginAt: { type: Date },
   referredBy: { type: String },
   referralCount: { type: Number, default: 0 },
-  refRewardClaimed: { type: Boolean, default: false },
+  refRewardClaimed: {
+    type: [Boolean],
+    default: [false, false, false, false, false],
+  },
 });
 
 const User = mongoose.model("User", UserSchema);
