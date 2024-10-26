@@ -24,9 +24,11 @@ const UserSchema = new mongoose.Schema({
   rewards: { type: Number, default: 0 },
   hasClaimed: { type: Boolean, default: false },
   lastClaimedAt: { type: Date },
-  streakCount: { type: Number, default: 0 }, // Track the current streak
+  streakCount: { type: Number, default: 0 },
   lastLoginAt: { type: Date },
-  referredBy: { type: String }, // Track the last login date
+  referredBy: { type: String },
+  referralCount: { type: Number, default: 0 },
+  refRewardClaimed: { type: Boolean, default: false },
 });
 
 const User = mongoose.model("User", UserSchema);
@@ -45,25 +47,34 @@ app.use(cors(corsOptions));
 // Handle the /start command with or without a referral ID
 bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
-  const referrerId = match[1]; // Extract the referrer ID from the referral link (if exists)
+  const referrerId = match[1]; // Extract the referrer ID from the referral link
   const { id, first_name: firstName, last_name: lastName = "" } = msg.from;
 
-  // Check if the user already exists in the database
   let user = await User.findOne({ telegramId: id });
 
   if (!user) {
-    // If the user doesn't exist, create a new user
     user = new User({ telegramId: id, firstName, lastName });
 
-    // If the referrerId exists, store it
     if (referrerId) {
-      user.referredBy = referrerId; // Store the referrer in the user model
+      user.referredBy = referrerId; // Store the referrer
+      const referrer = await User.findOne({ telegramId: referrerId });
+      if (referrer) {
+        referrer.referralCount += 1; // Increment the referrer’s count
+        const pointsAwarded = calculateReferralPoints(referrer.referralCount); // Calculate points based on referrals
+        referrer.rewards += pointsAwarded; // Add points to rewards
+        await referrer.save(); // Save the referrer’s new rewards
+
+        // Notify the referrer about their new points
+        bot.sendMessage(
+          referrerId,
+          `You referred ${user.firstName} ${user.lastName} and earned ${pointsAwarded} points!`
+        );
+      }
     }
 
     await user.save();
   }
 
-  // Modify the URL to include the user ID as a query parameter
   const inlineKeyboard = {
     reply_markup: {
       inline_keyboard: [
@@ -82,17 +93,6 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   // Send welcome message
   const welcomeMessage = `Welcome, ${user.firstName}! Click the button below to check your stats.`;
   bot.sendMessage(chatId, welcomeMessage, inlineKeyboard);
-
-  // If the user was referred by someone, notify the referrer (optional)
-  if (referrerId) {
-    const referrer = await User.findOne({ telegramId: referrerId });
-    if (referrer) {
-      bot.sendMessage(
-        referrerId,
-        `You referred ${user.firstName} ${user.lastName} and earned a reward!`
-      );
-    }
-  }
 });
 
 // Generate JWT token for authentication
@@ -196,21 +196,24 @@ app.get("/api/user/referrals/:userId", async (req, res) => {
   const userId = req.params.userId;
 
   try {
-    // Find the users referred by the given userId
     const referredUsers = await User.find({ referredBy: userId });
 
-    // Map the referred users to include their first name, last name, and rewards
     const referralDetails = referredUsers.map((user) => ({
       firstName: user.firstName,
       lastName: user.lastName,
-      rewards: user.rewards, // Assuming each referred user has rewards
+      rewards: user.rewards,
     }));
 
-    // Count how many referrals there are
     const referredCount = referralDetails.length;
 
-    // Send the referred count and details back in the response
-    res.json({ referredCount, referralDetails });
+    // Get the referrer user
+    const referrer = await User.findOne({ telegramId: userId });
+
+    res.json({
+      referredCount,
+      referralDetails,
+      refRewardClaimed: referrer?.refRewardClaimed || false,
+    });
   } catch (error) {
     console.error("Error fetching referred users:", error);
     res
@@ -218,6 +221,56 @@ app.get("/api/user/referrals/:userId", async (req, res) => {
       .json({ error: "Internal Server Error", details: error.message });
   }
 });
+
+app.post("/api/user/:userId/claimReferralReward", async (req, res) => {
+  const userId = req.params.userId; // This is your telegramId
+  const { index } = req.body;
+
+  // Validate the index
+  if (typeof index !== "number" || index < 0 || index > 4) {
+    return res.status(400).json({ message: "Invalid index" });
+  }
+
+  try {
+    // Find user by telegramId instead of _id
+    const user = await User.findOne({ telegramId: userId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if the reward for this milestone has already been claimed
+    if (user.refRewardClaimed[index]) {
+      return res.status(400).json({ message: "Reward already claimed" });
+    }
+
+    // Mark the reward as claimed
+    user.refRewardClaimed[index] = true;
+    // Increment rewards based on the index
+    const rewardsArray = [30, 90, 150, 300, 750]; // Define your reward values for each index
+    user.rewards += rewardsArray[index];
+
+    await user.save(); // Save changes to the database
+
+    res
+      .status(200)
+      .json({ message: "Reward claimed successfully", rewards: user.rewards });
+  } catch (error) {
+    console.error("Error claiming referral reward:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message }); // Include error message for easier debugging
+  }
+});
+
+// Function to calculate referral points based on referral count
+const calculateReferralPoints = (referralCount) => {
+  if (referralCount >= 25) return 25;
+  if (referralCount >= 10) return 10;
+  if (referralCount >= 5) return 5;
+  if (referralCount >= 3) return 30 * 3; // Custom logic for rewards
+  if (referralCount >= 1) return 30;
+  return 0;
+};
 
 // Handle user login (you can call this function when a user logs in)
 const handleLogin = async (userId) => {
