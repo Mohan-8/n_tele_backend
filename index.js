@@ -24,6 +24,7 @@ const UserSchema = new mongoose.Schema({
   rewards: { type: Number, default: 0 },
   hasClaimed: { type: Boolean, default: false },
   lastClaimedAt: { type: Date },
+  lastClaimedDate: { type: Date },
   streakCount: { type: Number, default: 0 },
   lastLoginAt: { type: Date },
   referredBy: { type: String },
@@ -33,7 +34,6 @@ const UserSchema = new mongoose.Schema({
     default: [false, false, false, false, false],
   },
 });
-
 const User = mongoose.model("User", UserSchema);
 
 // Create an Express app
@@ -275,38 +275,61 @@ const calculateReferralPoints = (referralCount) => {
   return 0;
 };
 
-// Handle user login (you can call this function when a user logs in)
+const getTodayGMT = () => {
+  const now = new Date();
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+};
+
+// Handle login and streak update
 const handleLogin = async (userId) => {
   const user = await User.findOne({ telegramId: userId });
   if (!user) {
     return { error: "User not found" };
   }
-  const now = new Date();
-  const lastLogin = user.lastLoginAt;
-  const ONE_DAY = 24 * 60 * 60 * 1000;
+
+  const todayGMT = getTodayGMT();
+  // const todayGMT = new Date("2024-11-01T00:00:00.000Z");
+  // console.log(todayGMT);
+  const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
+
   if (lastLogin) {
-    const timeSinceLastLogin = now - lastLogin;
-    if (timeSinceLastLogin > ONE_DAY) {
-      user.streakCount = 1;
-    } else {
-      user.streakCount += 1;
+    const lastLoginDateGMT = new Date(
+      Date.UTC(
+        lastLogin.getUTCFullYear(),
+        lastLogin.getUTCMonth(),
+        lastLogin.getUTCDate()
+      )
+    );
+
+    // If the last login date is before today's date at 00:00 GMT, update the streak
+    if (lastLoginDateGMT < todayGMT) {
+      // Check if they logged in exactly one day ago (streak continuation)
+      if ((todayGMT - lastLoginDateGMT) / (1000 * 60 * 60 * 24) === 1) {
+        user.streakCount += 1;
+      } else {
+        // Reset streak if more than one day was missed
+        user.streakCount = 1;
+      }
+      user.lastLoginAt = todayGMT; // Update lastLoginAt to today at 00:00 GMT
     }
   } else {
+    // First login, set streakCount to 1 and lastLoginAt to today at 00:00 GMT
     user.streakCount = 1;
-  }
-  const pointsEarned = user.streakCount <= 7 ? user.streakCount * 6 : 0;
-  user.rewards += pointsEarned;
-  if (user.streakCount > 7) {
-    user.streakCount = 0;
+    user.lastLoginAt = todayGMT;
   }
 
-  user.lastLoginAt = now;
+  // Calculate points based on streak count (e.g., 6 points per streak for up to 7 days)
+  const pointsEarned = user.streakCount <= 7 ? user.streakCount * 6 : 0;
+  user.rewards += pointsEarned;
+
   await user.save();
 
   return {
     rewards: user.rewards,
     streakCount: user.streakCount,
-    pointsEarned, // Return points earned as well for frontend use
+    pointsEarned,
   };
 };
 
@@ -321,6 +344,7 @@ app.post("/api/user/:userId/login", async (req, res) => {
     res.json({
       streakCount: updatedUser.streakCount,
       rewards: updatedUser.rewards,
+      pointsEarned: updatedUser.pointsEarned,
     });
   } catch (error) {
     console.error("Error handling login:", error);
