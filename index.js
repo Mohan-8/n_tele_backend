@@ -290,7 +290,7 @@ const handleLogin = async (userId) => {
   }
 
   const todayGMT = getTodayGMT();
-  // const todayGMT = new Date("2024-11-01T00:00:00.000Z");
+  // const todayGMT = new Date("2024-11-07T00:00:00.000Z");
   // console.log(todayGMT);
   const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
 
