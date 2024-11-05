@@ -33,7 +33,12 @@ const UserSchema = new mongoose.Schema({
     type: [Boolean],
     default: [false, false, false, false, false],
   },
+  airdropClaimed: {
+    type: [Boolean],
+    default: [false, false, false, false, false],
+  },
 });
+
 const User = mongoose.model("User", UserSchema);
 
 // Create an Express app
@@ -127,7 +132,7 @@ app.get("/api/user/:userId", async (req, res) => {
     }
 
     const now = new Date();
-    const claimInterval = 4 * 60 * 60 * 1000; // 1 minute for testing, change to 8 hours (8 * 60 * 60 * 1000) for production
+    const claimInterval = 8 * 60 * 60 * 1000; // 1 minute for testing, change to 8 hours (8 * 60 * 60 * 1000) for production
     let timeRemaining = 0;
     let canClaim = false;
     let streakCount = user.streakCount;
@@ -235,7 +240,6 @@ app.post("/api/user/:userId/claimReferralReward", async (req, res) => {
   }
 
   try {
-    // Find user by telegramId instead of _id
     const user = await User.findOne({ telegramId: userId });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -248,11 +252,10 @@ app.post("/api/user/:userId/claimReferralReward", async (req, res) => {
 
     // Mark the reward as claimed
     user.refRewardClaimed[index] = true;
-    // Increment rewards based on the index
-    const rewardsArray = [30, 90, 150, 300, 750]; // Define your reward values for each index
+    const rewardsArray = [250, 1000, 2500, 6000, 21550]; // Updated rewards
     user.rewards += rewardsArray[index];
 
-    await user.save(); // Save changes to the database
+    await user.save();
 
     res
       .status(200)
@@ -261,19 +264,9 @@ app.post("/api/user/:userId/claimReferralReward", async (req, res) => {
     console.error("Error claiming referral reward:", error);
     res
       .status(500)
-      .json({ message: "Internal server error", error: error.message }); // Include error message for easier debugging
+      .json({ message: "Internal server error", error: error.message });
   }
 });
-
-// Function to calculate referral points based on referral count
-const calculateReferralPoints = (referralCount) => {
-  if (referralCount >= 25) return 25;
-  if (referralCount >= 10) return 10;
-  if (referralCount >= 5) return 5;
-  if (referralCount >= 3) return 30 * 3; // Custom logic for rewards
-  if (referralCount >= 1) return 30;
-  return 0;
-};
 
 const getTodayGMT = () => {
   const now = new Date();
@@ -283,6 +276,11 @@ const getTodayGMT = () => {
 };
 
 // Handle login and streak update
+const streakRewards = [
+  100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400,
+  1500, 1600, 1700, 1800, 1900, 2000, 2100,
+];
+
 const handleLogin = async (userId) => {
   const user = await User.findOne({ telegramId: userId });
   if (!user) {
@@ -290,8 +288,6 @@ const handleLogin = async (userId) => {
   }
 
   const todayGMT = getTodayGMT();
-  // const todayGMT = new Date("2024-11-07T00:00:00.000Z");
-  // console.log(todayGMT);
   const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
 
   if (lastLogin) {
@@ -303,25 +299,22 @@ const handleLogin = async (userId) => {
       )
     );
 
-    // If the last login date is before today's date at 00:00 GMT, update the streak
     if (lastLoginDateGMT < todayGMT) {
-      // Check if they logged in exactly one day ago (streak continuation)
       if ((todayGMT - lastLoginDateGMT) / (1000 * 60 * 60 * 24) === 1) {
         user.streakCount += 1;
       } else {
-        // Reset streak if more than one day was missed
         user.streakCount = 1;
       }
-      user.lastLoginAt = todayGMT; // Update lastLoginAt to today at 00:00 GMT
+      user.lastLoginAt = todayGMT;
     }
   } else {
-    // First login, set streakCount to 1 and lastLoginAt to today at 00:00 GMT
     user.streakCount = 1;
     user.lastLoginAt = todayGMT;
   }
 
-  // Calculate points based on streak count (e.g., 6 points per streak for up to 7 days)
-  const pointsEarned = user.streakCount <= 7 ? user.streakCount * 6 : 0;
+  const streakIndex = user.streakCount - 1;
+  const pointsEarned =
+    streakIndex < streakRewards.length ? streakRewards[streakIndex] : 0;
   user.rewards += pointsEarned;
 
   await user.save();
@@ -352,15 +345,15 @@ app.post("/api/user/:userId/login", async (req, res) => {
   }
 });
 
-// Updated endpoint for fetching streak data
+// Endpoint for fetching streak data
 app.get("/api/user/:userId/streak", async (req, res) => {
   try {
     const user = await User.findOne({ telegramId: req.params.userId });
     if (user) {
       return res.json({
-        streakCount: user.streakCount, // Updated to use the correct streak field
+        streakCount: user.streakCount,
         rewards: user.rewards,
-        canClaim: !user.hasClaimed, // User can claim if they haven't already
+        canClaim: !user.hasClaimed,
       });
     }
     res.status(404).json({ error: "User not found" });
@@ -368,8 +361,76 @@ app.get("/api/user/:userId/streak", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+app.post("/api/user/:userId/airdropAction", async (req, res) => {
+  const userId = req.params.userId; // This is your telegramId
+  const { action } = req.body; // Action type (e.g., 'buyRaydium', 'buyTelegram', etc.)
+  // Define points for each action
+  const points = {
+    buyRaydium: 5000,
+    buyTelegram: 5000,
+    followTwitter: 2500,
+    joinTelegram: 2500,
+    visitWebsite: 2500,
+  };
+  try {
+    // Find user by telegramId
+    const user = await User.findOne({ telegramId: userId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-// Other parts of your code remain unchanged
+    // Check if the action is valid
+    if (!points[action]) {
+      return res.status(400).json({ message: "Invalid action" });
+    }
+
+    // Get the index of the action to update the airdropClaimed array
+    const actionIndex = Object.keys(points).indexOf(action);
+
+    if (user.airdropClaimed[actionIndex]) {
+      return res
+        .status(400)
+        .json({ message: "You have already claimed this airdrop." });
+    }
+
+    // Increment user's rewards based on the action
+    user.rewards += points[action];
+    // Mark the airdrop as claimed
+    user.airdropClaimed[actionIndex] = true;
+
+    await user.save(); // Save changes to the database
+
+    res
+      .status(200)
+      .json({ message: "Points added successfully", rewards: points[action] });
+  } catch (error) {
+    console.error("Error processing airdrop action:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+});
+app.get("/api/user/:userId/airdropStatus", async (req, res) => {
+  const userId = req.params.userId; // This should be the user's Telegram ID
+
+  try {
+    const user = await User.findOne({ telegramId: userId }); // Ensure you have a telegramId field
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Send back airdropClaimed and rewards
+    res.status(200).json({
+      airdropClaimed: user.airdropClaimed,
+      rewards: user.rewards,
+    });
+  } catch (error) {
+    console.error("Error fetching user airdrop status:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+});
 
 // Start the Express server
 const PORT = process.env.PORT;
