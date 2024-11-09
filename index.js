@@ -64,13 +64,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
       const referrer = await User.findOne({ telegramId: referrerId });
       if (referrer) {
         referrer.referralCount += 1;
-        // const pointsAwarded = calculateReferralPoints(referrer.referralCount);
-        // referrer.rewards += pointsAwarded;
         await referrer.save();
-        bot.sendMessage(
-          referrerId,
-          `You referred ${user.firstName} ${user.lastName} !`
-        );
       }
     }
 
