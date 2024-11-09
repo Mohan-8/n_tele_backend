@@ -86,7 +86,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
     },
   };
 
-  const welcomeMessage = `Welcome, ${user.firstName}! Click the button below to check your stats.`;
+  const welcomeMessage = `Welcome, ${user.firstName}! Click the button below to Launch the Game.`;
   bot.sendMessage(chatId, welcomeMessage, inlineKeyboard);
 });
 
