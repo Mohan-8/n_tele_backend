@@ -25,6 +25,7 @@ const UserSchema = new mongoose.Schema({
   hasClaimed: { type: Boolean, default: false },
   lastClaimedAt: { type: Date },
   lastClaimedDate: { type: Date },
+  sthasClaimed: { type: Boolean, default: false },
   streakCount: { type: Number, default: 0 },
   lastLoginAt: { type: Date },
   referredBy: { type: String },
@@ -353,7 +354,7 @@ app.get("/api/user/:userId/streak", async (req, res) => {
       return res.json({
         streakCount: user.streakCount,
         rewards: user.rewards,
-        canClaim: !user.hasClaimed,
+        canClaim: !user.sthasClaimed,
       });
     }
     res.status(404).json({ error: "User not found" });
@@ -373,7 +374,6 @@ app.post("/api/user/:userId/airdropAction", async (req, res) => {
     visitWebsite: 2500,
   };
   try {
-    // Find user by telegramId
     const user = await User.findOne({ telegramId: userId });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -384,7 +384,6 @@ app.post("/api/user/:userId/airdropAction", async (req, res) => {
       return res.status(400).json({ message: "Invalid action" });
     }
 
-    // Get the index of the action to update the airdropClaimed array
     const actionIndex = Object.keys(points).indexOf(action);
 
     if (user.airdropClaimed[actionIndex]) {
@@ -392,10 +391,7 @@ app.post("/api/user/:userId/airdropAction", async (req, res) => {
         .status(400)
         .json({ message: "You have already claimed this airdrop." });
     }
-
-    // Increment user's rewards based on the action
     user.rewards += points[action];
-    // Mark the airdrop as claimed
     user.airdropClaimed[actionIndex] = true;
 
     await user.save(); // Save changes to the database
@@ -411,15 +407,13 @@ app.post("/api/user/:userId/airdropAction", async (req, res) => {
   }
 });
 app.get("/api/user/:userId/airdropStatus", async (req, res) => {
-  const userId = req.params.userId; // This should be the user's Telegram ID
+  const userId = req.params.userId;
 
   try {
-    const user = await User.findOne({ telegramId: userId }); // Ensure you have a telegramId field
+    const user = await User.findOne({ telegramId: userId });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-
-    // Send back airdropClaimed and rewards
     res.status(200).json({
       airdropClaimed: user.airdropClaimed,
       rewards: user.rewards,
