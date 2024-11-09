@@ -69,7 +69,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
         await referrer.save();
         bot.sendMessage(
           referrerId,
-          `You referred ${user.firstName} ${user.lastName} and earned ${pointsAwarded} points!`
+          `You referred ${user.firstName} ${user.lastName} !`
         );
       }
     }
