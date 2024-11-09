@@ -38,8 +38,9 @@ const UserSchema = new mongoose.Schema({
     type: [Boolean],
     default: [false, false, false, false, false],
   },
+  solanaAddress: { type: String },
+  solanaClaimed: { type: Boolean, default: false },
 });
-
 const User = mongoose.model("User", UserSchema);
 
 // Create an Express app
@@ -363,9 +364,8 @@ app.get("/api/user/:userId/streak", async (req, res) => {
   }
 });
 app.post("/api/user/:userId/airdropAction", async (req, res) => {
-  const userId = req.params.userId; // This is your telegramId
-  const { action } = req.body; // Action type (e.g., 'buyRaydium', 'buyTelegram', etc.)
-  // Define points for each action
+  const userId = req.params.userId;
+  const { action } = req.body;
   const points = {
     buyRaydium: 5000,
     buyTelegram: 5000,
@@ -420,6 +420,55 @@ app.get("/api/user/:userId/airdropStatus", async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching user airdrop status:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+});
+app.post("/api/user/:userId/submitSolanaAddress", async (req, res) => {
+  const { userId } = req.params;
+  const { solanaAddress } = req.body;
+  if (!solanaAddress) {
+    return res.status(400).json({ message: "Solana address is required" });
+  }
+  try {
+    const user = await User.findOne({ telegramId: userId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (user.solanaAddress) {
+      return res.status(400).json({ message: "Solana address already set" });
+    }
+    user.solanaAddress = solanaAddress;
+    user.solanaClaimed = true;
+    user.rewards += 2000;
+    await user.save();
+    res.status(200).json({
+      message: "Solana address updated successfully",
+      rewards: user.rewards,
+    });
+  } catch (error) {
+    console.error("Error updating Solana address:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+});
+app.get("/api/user/:userId/solanaInfo", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const user = await User.findOne({ telegramId: userId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      solanaAddress: user.solanaAddress,
+      solanaClaimed: user.solanaClaimed,
+    });
+  } catch (error) {
+    console.error("Error fetching Solana info:", error);
     res
       .status(500)
       .json({ message: "Internal server error", error: error.message });
