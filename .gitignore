@@ -1,4 +1,5 @@
 .vercel
 /node_modules
-.index.js
 .env
+.server.js
+.user.model.js

@@ -1,24 +1,21 @@
-const TelegramBot = require("node-telegram-bot-api");
 const express = require("express");
-require("dotenv").config();
 const cors = require("cors");
+require("dotenv").config();
+const app = express();
+app.use(express.json());
+
+const PORT = process.env.PORT;
+// user.model.js
 const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
 
-const token = process.env.TOKEN;
-const bot = new TelegramBot(token, { polling: true });
-console.log("Telegram Bot is running");
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch((err) => console.error("MongoDB connection error:", err));
-
-const UserSchema = new mongoose.Schema({
+const userSchema = new mongoose.Schema({
   telegramId: { type: String, required: true, unique: true },
   firstName: { type: String, required: true },
   lastName: { type: String },
-  rewards: { type: Number, default: 0 },
   hasClaimed: { type: Boolean, default: false },
+  rewards: { type: Number, default: 0 },
+  farmingStartTime: { type: Date, default: null },
+  isFarming: { type: Boolean, default: false },
   lastClaimedAt: { type: Date },
   lastClaimedDate: { type: Date },
   sthasClaimed: { type: Boolean, default: false },
@@ -37,9 +34,7 @@ const UserSchema = new mongoose.Schema({
   solanaAddress: { type: String },
   solanaClaimed: { type: Boolean, default: false },
 });
-const User = mongoose.model("User", UserSchema);
 
-const app = express();
 app.use(express.json());
 
 const corsOptions = {
@@ -49,6 +44,22 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+// Initialize the bot
+const TelegramBot = require("node-telegram-bot-api");
+const token = process.env.TOKEN;
+const bot = new TelegramBot(token, { polling: true });
+console.log("Telegram Bot is running");
+
+// Connect to MongoDB
+mongoose
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("MongoDB connected successfully"))
+  .catch((err) => console.error("MongoDB connection error:", err));
+const User = mongoose.model("User", userSchema);
+// Telegram bot /start command with referral handling
 bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const referrerId = match[1];
@@ -99,24 +110,9 @@ app.get("/api/user/:userId", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const now = new Date();
-    const claimInterval = 8 * 60 * 60 * 1000;
-    let timeRemaining = 0;
     let canClaim = false;
     let streakCount = user.streakCount;
     let lastlogin = user.lastLoginAt;
-    if (!user.lastClaimedAt) {
-      canClaim = true;
-      timeRemaining = claimInterval / 1000;
-    } else {
-      const elapsedTime = now - user.lastClaimedAt;
-
-      if (elapsedTime >= claimInterval) {
-        canClaim = true;
-      } else {
-        timeRemaining = (claimInterval - elapsedTime) / 1000;
-      }
-    }
 
     res.json({
       id: user.telegramId,
@@ -124,7 +120,6 @@ app.get("/api/user/:userId", async (req, res) => {
       lastName: user.lastName,
       rewards: user.rewards,
       canClaim,
-      timeRemaining,
       streakCount,
       lastlogin,
     });
@@ -135,36 +130,81 @@ app.get("/api/user/:userId", async (req, res) => {
       .json({ error: "Internal Server Error", details: error.message });
   }
 });
-
-app.post("/api/user/:userId/claim", async (req, res) => {
+app.post("/api/user/:userId/start-farming", async (req, res) => {
   const { userId } = req.params;
-  const { points } = req.body;
+  let user = await User.findOne({ telegramId: userId });
 
-  try {
-    await User.updateOne(
-      { telegramId: userId },
-      {
-        $inc: { rewards: points },
-        $set: { hasClaimed: true, lastClaimedAt: new Date() },
-      }
-    );
-    res.status(200).json({ message: "Points claimed successfully." });
-  } catch (error) {
-    console.error("Error claiming points:", error);
-    res
-      .status(500)
-      .json({ error: "Internal Server Error", details: error.message });
+  if (user && user.isFarming) {
+    return res.status(400).json({ message: "Farming already in progress." });
   }
+
+  // Start farming
+  if (!user) {
+    user = new User({ telegramId: userId });
+  }
+
+  user.isFarming = true;
+  user.hasClaimed = false;
+  user.farmingStartTime = new Date();
+  await user.save();
+
+  res.json({
+    message: "Farming started!",
+    farmingStartTime: user.farmingStartTime,
+  });
 });
-// bot.onText(/\/referral/, async (msg) => {
-//   const chatId = msg.chat.id;
-//   const userId = msg.from.id;
 
-//   // Generate a referral link with the userId
-//   const referralLink = `http://t.me/minx_a_botin?start=${userId}`;
+// Claim tokens endpoint
+app.post("/api/user/:userId/claim-tokens", async (req, res) => {
+  const { userId } = req.params;
+  const user = await User.findOne({ telegramId: userId });
 
-//   bot.sendMessage(chatId, `Share your referral link: ${referralLink}`);
-// });
+  //   if (!user || (!user.isFarming && !user.hasClaimed)) {
+  //     return res.status(400).json({ message: "No farming session active." });
+  //   }
+
+  const timeElapsed = (new Date() - user.farmingStartTime) / 1000; // in seconds
+
+  if (timeElapsed < 60 * 3600) {
+    return res.status(400).json({ message: "Farming session not completed." });
+  }
+
+  // Add 28,800 tokens
+  user.rewards += 840;
+  user.isFarming = false;
+  user.hasClaimed = true;
+  user.farmingStartTime = null;
+  await user.save();
+
+  res.json({ message: "Tokens claimed!", tokens: user.tokens });
+});
+
+// Get status endpoint
+app.get("/api/user/:userId/get-status", async (req, res) => {
+  const { userId } = req.params;
+  const user = await User.findOne({ telegramId: userId });
+
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  const timeElapsed = user.isFarming
+    ? Math.floor((new Date() - user.farmingStartTime) / 1000)
+    : 0;
+  if (timeElapsed >= 60 * 3600) {
+    // If 8 hours have elapsed, set isFarming to false and cap tokens at 28800
+    user.isFarming = false;
+    user.timeElapsed = 60 * 3600; // cap at 8 hours
+    await user.save();
+  }
+
+  res.json({
+    tokens: user.rewards,
+    farming: user.isFarming,
+    timeElapsed,
+  });
+});
+
 app.get("/api/user/referrals/:userId", async (req, res) => {
   const userId = req.params.userId;
 
@@ -430,7 +470,6 @@ app.get("/api/user/:userId/solanaInfo", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
