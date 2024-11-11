@@ -165,7 +165,7 @@ app.post("/api/user/:userId/claim-tokens", async (req, res) => {
 
   const timeElapsed = (new Date() - user.farmingStartTime) / 1000; // in seconds
 
-  if (timeElapsed < 60 * 3600) {
+  if (timeElapsed < 8 * 3600) {
     return res.status(400).json({ message: "Farming session not completed." });
   }
 
@@ -191,10 +191,10 @@ app.get("/api/user/:userId/get-status", async (req, res) => {
   const timeElapsed = user.isFarming
     ? Math.floor((new Date() - user.farmingStartTime) / 1000)
     : 0;
-  if (timeElapsed >= 60 * 3600) {
+  if (timeElapsed >= 8 * 3600) {
     // If 8 hours have elapsed, set isFarming to false and cap tokens at 28800
     user.isFarming = false;
-    user.timeElapsed = 60 * 3600; // cap at 8 hours
+    user.timeElapsed = 8 * 3600; // cap at 8 hours
     await user.save();
   }
 
