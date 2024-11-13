@@ -29,7 +29,7 @@ const userSchema = new mongoose.Schema({
   },
   airdropClaimed: {
     type: [Boolean],
-    default: [false, false, false, false, false],
+    default: [false, false, false, false, false,false],
   },
   solanaAddress: { type: String },
   solanaClaimed: { type: Boolean, default: false },
@@ -52,10 +52,7 @@ console.log("Telegram Bot is running");
 
 // Connect to MongoDB
 mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected successfully"))
   .catch((err) => console.error("MongoDB connection error:", err));
 const User = mongoose.model("User", userSchema);
@@ -368,6 +365,7 @@ app.post("/api/user/:userId/airdropAction", async (req, res) => {
     followTwitter: 2500,
     joinTelegram: 2500,
     visitWebsite: 2500,
+    LikeTwitter:2000,
   };
   try {
     const user = await User.findOne({ telegramId: userId });
