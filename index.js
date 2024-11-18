@@ -29,7 +29,11 @@ const userSchema = new mongoose.Schema({
   },
   airdropClaimed: {
     type: [Boolean],
+<<<<<<< HEAD
     default: [false, false, false, false, false, false, false, false],
+=======
+    default: [false, false, false, false, false,false],
+>>>>>>> 0da82593d3b228359e6201711a826b35acee84e0
   },
   solanaAddress: { type: String },
   solanaClaimed: { type: Boolean, default: false },
@@ -55,6 +59,7 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected successfully"))
   .catch((err) => console.error("MongoDB connection error:", err));
+<<<<<<< HEAD
 
 const User = mongoose.model("User", userSchema);
 app.get("/", (req, res) => {
@@ -62,6 +67,9 @@ app.get("/", (req, res) => {
     "WORKING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
   );
 });
+=======
+const User = mongoose.model("User", userSchema);
+>>>>>>> 0da82593d3b228359e6201711a826b35acee84e0
 // Telegram bot /start command with referral handling
 bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
@@ -371,9 +379,13 @@ app.post("/api/user/:userId/airdropAction", async (req, res) => {
     followTwitter: 2500,
     joinTelegram: 2500,
     visitWebsite: 2500,
+<<<<<<< HEAD
     LikeTwitter: 2000,
     joinBirds: 50,
     joinTon: 50,
+=======
+    LikeTwitter:2000,
+>>>>>>> 0da82593d3b228359e6201711a826b35acee84e0
   };
   try {
     const user = await User.findOne({ telegramId: userId });
