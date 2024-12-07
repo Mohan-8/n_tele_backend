@@ -1,8 +1,3 @@
 .vercel
 /node_modules
 .env
-<<<<<<< HEAD
-=======
-.server.js
-.user.model.js
->>>>>>> 0da82593d3b228359e6201711a826b35acee84e0

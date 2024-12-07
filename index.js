@@ -45,10 +45,10 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 // Initialize the bot
-const TelegramBot = require("node-telegram-bot-api");
-const token = process.env.TOKEN;
-const bot = new TelegramBot(token, { polling: true });
-console.log("Telegram Bot is running");
+// const TelegramBot = require("node-telegram-bot-api");
+// const token = process.env.TOKEN;
+// const bot = new TelegramBot(token, { polling: true });
+// console.log("Telegram Bot is running");
 
 // Connect to MongoDB
 mongoose
@@ -63,46 +63,46 @@ app.get("/", (req, res) => {
 });
 
 // Telegram bot /start command with referral handling
-bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
-  const chatId = msg.chat.id;
-  const referrerId = match[1];
-  const { id, first_name: firstName, last_name: lastName = "" } = msg.from;
+// bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
+//   const chatId = msg.chat.id;
+//   const referrerId = match[1];
+//   const { id, first_name: firstName, last_name: lastName = "" } = msg.from;
 
-  let user = await User.findOne({ telegramId: id });
+//   let user = await User.findOne({ telegramId: id });
 
-  if (!user) {
-    user = new User({ telegramId: id, firstName, lastName });
+//   if (!user) {
+//     user = new User({ telegramId: id, firstName, lastName });
 
-    if (referrerId) {
-      user.referredBy = referrerId;
-      const referrer = await User.findOne({ telegramId: referrerId });
-      if (referrer) {
-        referrer.referralCount += 1;
-        await referrer.save();
-      }
-    }
+//     if (referrerId) {
+//       user.referredBy = referrerId;
+//       const referrer = await User.findOne({ telegramId: referrerId });
+//       if (referrer) {
+//         referrer.referralCount += 1;
+//         await referrer.save();
+//       }
+//     }
 
-    await user.save();
-  }
+//     await user.save();
+//   }
 
-  const inlineKeyboard = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: "Launch",
-            web_app: {
-              url: `https://aelonnextfront.vercel.app/?userId=${user.telegramId}`,
-            },
-          },
-        ],
-      ],
-    },
-  };
+//   const inlineKeyboard = {
+//     reply_markup: {
+//       inline_keyboard: [
+//         [
+//           {
+//             text: "Launch",
+//             web_app: {
+//               url: `https://aelonnextfront.vercel.app/?userId=${user.telegramId}`,
+//             },
+//           },
+//         ],
+//       ],
+//     },
+//   };
 
-  const welcomeMessage = `Welcome, ${user.firstName}! Click the button below to Launch the Game.`;
-  bot.sendMessage(chatId, welcomeMessage, inlineKeyboard);
-});
+//   const welcomeMessage = `Welcome, ${user.firstName}! Click the button below to Launch the Game.`;
+//   bot.sendMessage(chatId, welcomeMessage, inlineKeyboard);
+// });
 
 app.get("/api/user/:userId", async (req, res) => {
   const { userId } = req.params;
